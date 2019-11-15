@@ -1,17 +1,28 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"log"
+	"os"
 	"runtime"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+)
+
+var (
+	namespace = "example-namespace2"
 )
 
 func main() {
@@ -41,7 +52,30 @@ func main() {
 		log.Fatalf("Cannot create client set %v", err)
 	}
 
-	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
+	_, err = clientSet.CoreV1().Namespaces().Create(&apiv1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	})
+
+	if err != nil {
+		log.Fatalf("error create namespace %s %v", namespace, err)
+	}
+	// Create informer
+	informerFactory := informers.NewSharedInformerFactory(clientSet, time.Second*1)
+	podInformer := informerFactory.Core().V1().Pods()
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			log.Printf("object %v has been added\n", obj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			log.Printf("object %v has been deleted\n", obj)
+		},
+	})
+	informerFactory.Start(wait.NeverStop)
+	informerFactory.WaitForCacheSync(wait.NeverStop)
+
+	deploymentsClient := clientSet.AppsV1().Deployments(namespace)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -87,7 +121,7 @@ func main() {
 	}
 	log.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())
 
-	pods, err := clientSet.CoreV1().Pods(apiv1.NamespaceDefault).List(metav1.ListOptions{})
+	pods, err := clientSet.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 
 	if err != nil {
 		log.Fatalf("error list pods %v", err)
@@ -97,6 +131,7 @@ func main() {
 		log.Printf("pod %s\n", pod.Name)
 	}
 
+	prompt()
 	log.Println("Deleting deployment...")
 	deletePolicy := metav1.DeletePropagationForeground
 	if err := deploymentsClient.Delete("demo-deployment", &metav1.DeleteOptions{
@@ -106,6 +141,26 @@ func main() {
 	}
 
 	log.Println("Deleted deployment.")
+	prompt()
+
+	err = clientSet.CoreV1().Namespaces().Delete(namespace, &metav1.DeleteOptions{})
+
+	if err != nil {
+		log.Fatalf("error deleting namespace %s %v", namespace, err)
+	}
+	log.Printf("Deleted namespace %s\n", namespace)
 }
 
 func int32Ptr(i int32) *int32 { return &i }
+
+func prompt() {
+	fmt.Printf("-> Press Return key to continue.")
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		break
+	}
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+	fmt.Println()
+}
