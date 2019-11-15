@@ -4,9 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"log"
 	"os"
 	"runtime"
@@ -14,6 +11,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -61,6 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error create namespace %s %v", namespace, err)
 	}
+
 	// Create informer
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*1,
 		informers.WithNamespace(namespace))
@@ -132,7 +134,6 @@ func main() {
 		log.Printf("pod %s\n", pod.Name)
 	}
 
-	prompt()
 	log.Println("Deleting deployment...")
 	deletePolicy := metav1.DeletePropagationForeground
 	if err := deploymentsClient.Delete("demo-deployment", &metav1.DeleteOptions{
@@ -142,7 +143,6 @@ func main() {
 	}
 
 	log.Println("Deleted deployment.")
-	prompt()
 
 	err = clientSet.CoreV1().Namespaces().Delete(namespace, &metav1.DeleteOptions{})
 
