@@ -62,7 +62,8 @@ func main() {
 		log.Fatalf("error create namespace %s %v", namespace, err)
 	}
 	// Create informer
-	informerFactory := informers.NewSharedInformerFactory(clientSet, time.Second*1)
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Second*1,
+		informers.WithNamespace(namespace))
 	podInformer := informerFactory.Core().V1().Pods()
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
