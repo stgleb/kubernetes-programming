@@ -11,6 +11,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
@@ -49,7 +50,7 @@ func main() {
 		runtime.GOOS, runtime.GOARCH)
 	clientSet, err := kubernetes.NewForConfig(config)
 
-	if err != nil {
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		log.Fatalf("Cannot create client set %v", err)
 	}
 
